@@ -1,0 +1,23 @@
+syncframe length: 1536
+segment 1 is 5499 syncframes long
+
+first segment is 8446464 bytes long
+
+dd if=test.ac3 of=segment_1.ac3 bs=1536 count=5499
+
+first segment starts at frame 1 and goes through frame 5499 (5499 frames)
+second segment starts at frame 5500 and goes through frame 105218 (99719 frames)
+third segment starts at frame 105219 and goes through frame 112279 (7061 frames)
+
+
+syncframe 5498 acmod: 2
+syncframe 5499 acmod: 7
+
+syncframe 105217 acmod: 7
+syncframe 105218 acmod: 2
+
+
+dd if=test.ac3 of=segment_2.ac3 bs=1536 count=99719 skip=5499
+dd if=test.ac3 of=segment_3.ac3 bs=1536 count=7061 skip=105218
+
+
