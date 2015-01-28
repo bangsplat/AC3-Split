@@ -6,9 +6,9 @@ use File::Find;
 #####
 #
 # splitAC3.pl
-#	version		0.9
+#	version		0.91
 # 	created 	2014-12-10
-# 	modified	2014-12-19
+# 	modified	2015-01-28
 # 	author		Theron Trowbridge
 #
 # based on parseAC3.pl
@@ -25,15 +25,10 @@ use File::Find;
 #####
 
 
-#####	for now, just concentrate on finding the changes
-##### 	and focus on Audio Coding Mode (acmod) - switch from 2.0 to 5.1 and vice/versa
-#####	meaning, parse through each sync frame and parse the header for acmod
-##### 	maybe output the acmod value for each sync frame
-
-
 # constants
 
 my $AC3_SYNC_WORD = pack( 'H[4]', "0b77" );
+my $verbosity = 0;
 
 # variables
 
@@ -67,12 +62,19 @@ my $file_basename;
 my $segment_number;
 my $current_filename;
 
+my $analyze_only = 0;
+
+
 
 # main
 
 ## quick an dirty
 ## only one file, no globs
 $input_file = @ARGV[0];
+
+if ( @ARGV[1] ne undef ) {
+	$analyze_only = 1;
+}
 
 if ( $input_file eq undef ) {
 	find( \&findAC3, "." );
@@ -81,7 +83,6 @@ if ( $input_file eq undef ) {
 
 $file_basename = $input_file;
 $file_basename =~ s/\.ac3$//;
-# this assume
 
 ### it would be nice to find any/all .ac3 files if no @ARGV[0]
 
@@ -122,8 +123,10 @@ $syncframe_size = $num_words_in_syncframe * 2;
 $total_syncframes = $file_size / $syncframe_size;
 $total_seconds = $total_syncframes / 31.25;
 
-print "sync frames are: $syncframe_size bytes\n";
-print "stream is $total_syncframes frames (31.25 fps) long\n";
+if ( $verbosity > 0 ) {
+	print "sync frames are: $syncframe_size bytes\n";
+	print "stream is $total_syncframes frames (31.25 fps) long\n";
+}
 
 # rewind file
 seek( INPUT_FILE, 0, 0 );
@@ -175,23 +178,36 @@ for ( my $i = 0; $i < $total_syncframes; $i++ ) {
 		# it has changed
 		# close the current file
 		# 	make sure we aren't at the very start of the file first
-		if ( $segment_number > 0 ) { close( OUTPUT_FILE ); }
+		if ( !$analyze_only ) {
+			if ( $segment_number > 0 ) { close( OUTPUT_FILE ); }
+		}
 		# open a new segment file
 		$segment_number++;
 		$current_filename = $file_basename . "_$segment_number" . ".ac3";
-		print "$current_filename\n";
-		open( OUTPUT_FILE, '>', $current_filename );
-		binmode( OUTPUT_FILE );
+		if ( $verbosity > 0 ) {
+			print "$current_filename\n";
+		}
+		if ( !$analyze_only ) {
+			open( OUTPUT_FILE, '>', $current_filename );
+			binmode( OUTPUT_FILE );
+		}
 	}
 	
 	# write this frame to the current output file
-	print OUTPUT_FILE $buffer;
+	if ( !$analyze_only ) {
+		print OUTPUT_FILE $buffer;
+	}
 	
-	print "syncframe $i acmod: $acmod\n";
+	if ( $verbosity > 0 ) {
+		print "syncframe $i acmod: $acmod\n";
+	}
 
 }
 ### THIS WILL BREAK IF SYNCFRAME SIZE CHANGES
 ### but I think it's a safe risk for now
+
+# when we're all done, report the number of segments
+print "$segment_number\n";
 
 close( INPUT_FILE );
 close( OUTPUT_FILE );
