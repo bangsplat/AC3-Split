@@ -6,9 +6,9 @@ use File::Find;
 #####
 #
 # splitAC3.pl
-#	version		0.91
+#	version		0.92
 # 	created 	2014-12-10
-# 	modified	2015-01-28
+# 	modified	2015-02-13
 # 	author		Theron Trowbridge
 #
 # based on parseAC3.pl
@@ -61,6 +61,8 @@ my $current_frame_acmod;
 my $file_basename;
 my $segment_number;
 my $current_filename;
+
+my ( $previous_sample_rate, $current_sample_rate );
 
 my $analyze_only = 0;
 
@@ -123,6 +125,9 @@ $syncframe_size = $num_words_in_syncframe * 2;
 $total_syncframes = $file_size / $syncframe_size;
 $total_seconds = $total_syncframes / 31.25;
 
+# stash the sampling rate for analysis
+$previous_sample_rate = $current_sample_rate = $sampling_rate_in_khz;
+
 if ( $verbosity > 0 ) {
 	print "sync frames are: $syncframe_size bytes\n";
 	print "stream is $total_syncframes frames (31.25 fps) long\n";
@@ -145,8 +150,28 @@ for ( my $i = 0; $i < $total_syncframes; $i++ ) {
 	$byte_pointer += 2;
 #	print "syncframe $i syncword: $syncword\n";
 	
-	# we don't really care about the rest of the sync info, so skip it
-	$byte_pointer = 5;
+#	# we don't really care about the rest of the sync info, so skip it
+#	$byte_pointer = 5;
+
+	# well, maybe we do care :)
+	
+	# $byte_pointer is now pointing at crc1 (2 bytes)
+	# skip ahead to fscod/frmsizecod
+	$byte_pointer += 2;
+	
+	$bitfield = unpack( "B[8]", substr( $buffer, $byte_pointer, 1 ) );
+	$fscod = binary_to_decimal( substr( $bitfield, 0, 2 ) );
+	$frmsizecod = binary_to_decimal( substr( $bitfield, 2, 6 ) );
+	$current_sample_rate = getSamplingRate( $fscod );
+	
+#	print "syncframe $i sampling rate: $current_sample_rate\n";
+	
+	if ( $current_sample_rate != $previous_sample_rate ) {
+		print "ERROR - syncrframe $i has a different sampling rate: $current_sample_rate\n";
+	}
+	
+	# move on to bsid
+	$byte_pointer++;
 	
 	# decode bsid and bsmod, which is the next byte
 	$bitfield = unpack( "B[8]", substr( $buffer, $byte_pointer, 1 ) );
